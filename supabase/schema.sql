@@ -1,4 +1,4 @@
--- BASE Entertainment — "Build Your Setup" admin schema
+-- BASE Entertainment — "Build Your Dream" admin schema
 --
 -- Run this ONCE in your Supabase project: Dashboard → SQL Editor → New query →
 -- paste → Run. It is safe to run again; every statement is idempotent.

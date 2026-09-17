@@ -50,7 +50,7 @@ export default function BuildYourSetup() {
       <main id="main" className="builder wrap">
         <div className="builder-head">
           <p className="eyebrow">BEAUTIFUL MOMENTS, BEAUTIFUL PLACES</p>
-          <h1>Build Your Setup</h1>
+          <h1>Build Your Dream</h1>
           <p className="form-intro">
             {uploaded
               ? 'Pick the pieces you like and watch your setup come together. Drag the background to look around.'

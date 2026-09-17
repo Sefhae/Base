@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { ArrowUpRight, Check, Plus, Search } from 'lucide-react';
+import { ArrowUpRight, Check, Plus, Search, X } from 'lucide-react';
 import { CATEGORIES, SHOW_PRICES, formatPrice } from './catalog';
 import type { Piece } from './SetupCanvas';
 import {
@@ -12,9 +12,16 @@ import {
 } from '@/lib/setup-items';
 import { stashSetupSummary } from '../setup-storage';
 
+/* A shaped placeholder rather than a line of text: the canvas is the tallest
+   thing on the page, so a bare sentence in the middle of it reads as broken. */
 const SetupCanvas = dynamic(() => import('./SetupCanvas'), {
   ssr: false,
-  loading: () => <p className="canvas-loading">Preparing your 3D space…</p>,
+  loading: () => (
+    <output className="canvas-skeleton">
+      <span className="canvas-skeleton-floor" />
+      <span className="canvas-loading">Preparing your 3D space…</span>
+    </output>
+  ),
 });
 
 /**
@@ -62,6 +69,11 @@ export default function ModelBuilder({ items }: { items: SetupItemRow[] }) {
       }))
       .filter((group) => group.entries.length > 0);
   }, [entries, query]);
+
+  const matchCount = useMemo(
+    () => visibleGroups.reduce((sum, group) => sum + group.entries.length, 0),
+    [visibleGroups],
+  );
 
   const chosenEntries = useMemo(
     () =>
@@ -137,8 +149,32 @@ export default function ModelBuilder({ items }: { items: SetupItemRow[] }) {
     </div>
   );
 
+  const steps = [
+    { label: 'Choose your pieces', done: chosenEntries.length > 0 },
+    { label: 'Check the preview', done: chosenEntries.length > 0 },
+    { label: 'Send us your plan', done: false },
+  ];
+
   return (
     <>
+      <ol className="builder-steps">
+        {steps.map((step, index) => (
+          <li
+            key={step.label}
+            className={`builder-step${step.done ? ' is-done' : ''}${
+              !step.done && (index === 0 || steps[index - 1].done)
+                ? ' is-current'
+                : ''
+            }`}
+          >
+            <span className="builder-step-mark" aria-hidden="true">
+              {step.done ? <Check size={13} /> : index + 1}
+            </span>
+            <span className="builder-step-label">{step.label}</span>
+          </li>
+        ))}
+      </ol>
+
       <div className="builder-grid">
         <section className="palette" aria-label="Pieces you can add">
           <div className="palette-search">
@@ -150,16 +186,39 @@ export default function ModelBuilder({ items }: { items: SetupItemRow[] }) {
               placeholder="Search pieces"
               aria-label="Search pieces"
             />
+            {query ? (
+              <button
+                type="button"
+                className="palette-search-clear"
+                onClick={() => setQuery('')}
+                aria-label="Clear search"
+              >
+                <X size={14} aria-hidden="true" />
+              </button>
+            ) : null}
           </div>
+          {query ? (
+            <p className="palette-result-count" aria-live="polite">
+              {matchCount} result{matchCount === 1 ? '' : 's'}
+            </p>
+          ) : null}
           {visibleGroups.length === 0 ? (
             <p className="palette-empty">No pieces match that search.</p>
           ) : (
             <div className="palette-list">
-              {visibleGroups.map(({ category, entries: group }) => (
+              {visibleGroups.map(({ category, entries: group }) => {
+                const picked = group.filter((entry) =>
+                  chosen.includes(entry.key),
+                ).length;
+                return (
                 <div key={category} className="palette-group">
                   <p className="palette-heading">
                     <span>{category}</span>
-                    <span className="palette-count">{group.length}</span>
+                    <span
+                      className={`palette-count${picked > 0 ? ' is-picked' : ''}`}
+                    >
+                      {picked > 0 ? `${picked}/${group.length}` : group.length}
+                    </span>
                   </p>
                   {group.map((entry) => {
                     const added = chosen.includes(entry.key);
@@ -188,7 +247,8 @@ export default function ModelBuilder({ items }: { items: SetupItemRow[] }) {
                     );
                   })}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
@@ -210,9 +270,20 @@ export default function ModelBuilder({ items }: { items: SetupItemRow[] }) {
       <section className="setup-summary" aria-label="Your setup so far">
         <div className="summary-head">
           <h2>Your setup</h2>
-          <span className="summary-badge">
-            {chosenEntries.length} item{chosenEntries.length === 1 ? '' : 's'} ·{' '}
-            {pieces.length} model{pieces.length === 1 ? '' : 's'}
+          <span className="summary-head-side">
+            <span className="summary-badge">
+              {chosenEntries.length} item{chosenEntries.length === 1 ? '' : 's'} ·{' '}
+              {pieces.length} model{pieces.length === 1 ? '' : 's'}
+            </span>
+            {chosenEntries.length > 0 ? (
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => setChosen([])}
+              >
+                Clear all
+              </button>
+            ) : null}
           </span>
         </div>
 
@@ -223,22 +294,26 @@ export default function ModelBuilder({ items }: { items: SetupItemRow[] }) {
         ) : (
           <ul className="summary-list">
             {chosenEntries.map((entry) => (
-              <li key={entry.key} className="summary-card">
+              <li key={entry.key} className="summary-row">
                 <span className="summary-name">{entry.name}</span>
-                <span className="summary-foot">
-                  {entry.isPackage ? (
-                    <span className="summary-meta">
-                      {entry.items.length} models
-                    </span>
-                  ) : (
-                    <span className="summary-meta">Single piece</span>
-                  )}
-                  {SHOW_PRICES ? (
-                    <span className="summary-price">
-                      {formatPrice(entry.price)}
-                    </span>
-                  ) : null}
+                <span className="summary-meta">
+                  {entry.isPackage
+                    ? `${entry.items.length} models`
+                    : 'Single piece'}
                 </span>
+                {SHOW_PRICES ? (
+                  <span className="summary-price">
+                    {formatPrice(entry.price)}
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  className="summary-remove"
+                  onClick={() => toggle(entry.key)}
+                  aria-label={`Remove ${entry.name} from your setup`}
+                >
+                  <X size={15} aria-hidden="true" />
+                </button>
               </li>
             ))}
           </ul>

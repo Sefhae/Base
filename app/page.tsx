@@ -83,7 +83,7 @@ export default function Home() {
           {[
             ['Experiences', '#experiences'],
             ['Our approach', '#about'],
-            ['Build Your Setup', '/build-your-setup'],
+            ['Build Your Dream', '/build-your-setup'],
             ['FAQs', '#faqs'],
           ].map(([n, target]) =>
             target.startsWith('/') ? (
