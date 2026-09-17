@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { ArrowUpRight, ArrowRight, Menu, X, MapPin } from 'lucide-react';
 import {
   Accordion,
@@ -36,7 +37,7 @@ const faqs = [
   ],
   [
     'Where do you work?',
-    'We feature Orlando and Cocoa Beach as our Florida locations. Share your preferred venue or setting in your inquiry so we can confirm the details together.',
+    'We are based in Orlando and work all over Florida. Share your preferred venue or setting in your inquiry so we can confirm the details together.',
   ],
   [
     'How do I find out about pricing?',
@@ -80,15 +81,21 @@ export default function Home() {
           aria-label="Main navigation"
         >
           {[
-            ['Experiences', 'experiences'],
-            ['Our approach', 'about'],
-            ['Locations', 'locations'],
-            ['FAQs', 'faqs'],
-          ].map(([n, id]) => (
-            <a key={id} href={'#' + id} onClick={() => setMenu(false)}>
-              {n}
-            </a>
-          ))}
+            ['Experiences', '#experiences'],
+            ['Our approach', '#about'],
+            ['Build Your Setup', '/build-your-setup'],
+            ['FAQs', '#faqs'],
+          ].map(([n, target]) =>
+            target.startsWith('/') ? (
+              <Link key={target} href={target} onClick={() => setMenu(false)}>
+                {n}
+              </Link>
+            ) : (
+              <a key={target} href={target} onClick={() => setMenu(false)}>
+                {n}
+              </a>
+            ),
+          )}
         </nav>
         <a className="button nav-cta" href="#contact">
           Plan your moment <ArrowUpRight size={16} />
@@ -135,7 +142,6 @@ export default function Home() {
             </a>
           </div>
           <div className="hero-bottom">
-            <span>ORLANDO & COCOA BEACH</span>
             <a href="#experiences">
               DISCOVER THE EXPERIENCE <span>↓</span>
             </a>
@@ -256,26 +262,16 @@ export default function Home() {
               <br />
               <em>A Florida backdrop.</em>
             </h2>
-            <p>
-              City charm or an ocean breeze.
-              <br />
-              Let’s find the setting that feels right.
-            </p>
           </div>
-          <div className="location-grid">
-            {[
-              ['Orlando', 'Lakeside light. City energy. Your favorite place.'],
-              ['Cocoa Beach', 'Open skies. Ocean air. A moment by the water.'],
-            ].map(([name, desc]) => (
-              <a key={name} href="#contact">
-                <MapPin size={22} />
-                <div>
-                  <h3>{name}</h3>
-                  <p>{desc}</p>
-                </div>
-                <ArrowUpRight />
-              </a>
-            ))}
+          <div className="location-note">
+            <MapPin size={22} />
+            <div>
+              <h3>All over Florida</h3>
+              <p>
+                Based in Orlando and available statewide. Tell us where your
+                moment belongs and we will come to you.
+              </p>
+            </div>
           </div>
         </section>
         <section className="faq wrap" id="faqs">
@@ -286,9 +282,9 @@ export default function Home() {
               <br />
               <em>big moment.</em>
             </h2>
-            <a className="text-link" href="mailto:baseentertainment@gmail.com">
+            <Link className="text-link" href="/get-more-information">
               Ask us a question <ArrowUpRight size={18} />
-            </a>
+            </Link>
           </div>
           <Accordion>
             {faqs.map(([q, a], i) => (
@@ -312,18 +308,9 @@ export default function Home() {
               <br />
               We’ll take it from there, together.
             </p>
-            <a
-              className="button light"
-              href="mailto:baseentertainment@gmail.com?subject=Let%E2%80%99s%20plan%20my%20moment&body=Hi%20BASE!%0A%0AMy%20name%3A%0AOccasion%3A%0APreferred%20date%3A%0ALocation%3A%0APhotography%20or%20video%3A%0AMy%20ideas%3A%0A%0A"
-            >
-              Inquire about your date <ArrowUpRight size={18} />
-            </a>
-            <a
-              className="contact-email"
-              href="mailto:baseentertainment@gmail.com"
-            >
-              baseentertainment@gmail.com
-            </a>
+            <Link className="button light" href="/get-more-information">
+              Get more information <ArrowUpRight size={18} />
+            </Link>
           </div>
         </section>
       </main>
@@ -332,20 +319,10 @@ export default function Home() {
           <a href="#top" className="logo">
             BASE<span>ENTERTAINMENT</span>
           </a>
-          <p>
-            Moments worth making.
-            <br />
-            Memories worth keeping.
-          </p>
-          <div>
-            <span className="eyebrow">SAY HELLO</span>
-            <a href="tel:+14103902548">+1 (410) 390-2548</a>
-            <a href="tel:+13216559323">+1 (321) 655-9323</a>
-          </div>
         </div>
         <div className="footer-bottom">
           <span>© {new Date().getFullYear()} BASE Entertainment</span>
-          <span>Orlando · Cocoa Beach, Florida</span>
+          <span>Based in Orlando · Serving all of Florida</span>
           <a href="#top">BACK TO TOP ↑</a>
         </div>
       </footer>

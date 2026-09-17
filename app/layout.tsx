@@ -4,7 +4,7 @@ export const metadata: Metadata = {
   icons: { icon: '/favicon.svg' },
   title: 'BASE Entertainment | Florida Proposals, Celebrations & Photography',
   description:
-    'Make your next milestone meaningful with BASE Entertainment. Explore proposals, celebrations, photography and videography in Orlando and Cocoa Beach, Florida.',
+    'Make your next milestone meaningful with BASE Entertainment. Proposals, celebrations, photography and videography based in Orlando and available across Florida.',
 };
 export default function RootLayout({
   children,
