@@ -1039,3 +1039,83 @@ footer {
   font-size: 13px;
   max-width: 580px;
 }
+
+/* ---------------------------------------------------------------------------
+   /admin — the setup catalog panel. It reuses the builder's palette, field and
+   canvas rules; only what is specific to the panel lives here.
+   --------------------------------------------------------------------------- */
+.admin {
+  padding-top: 48px;
+  padding-bottom: 90px;
+}
+.admin-login {
+  max-width: 520px;
+}
+.admin-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.admin-grid {
+  display: grid;
+  grid-template-columns: minmax(230px, 300px) 1fr;
+  gap: 26px;
+  margin-top: 36px;
+  align-items: start;
+}
+.admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.admin-upload {
+  cursor: pointer;
+  width: 100%;
+}
+.admin-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.palette-item.is-selected {
+  border-color: var(--primary);
+  background: #fff;
+}
+.admin-hint {
+  margin: -8px 0 0;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+.admin-alert,
+.admin-note {
+  margin: 18px 0 0;
+  padding: 13px 15px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  border: 1px solid var(--border);
+}
+.admin-alert {
+  border-color: #c98b84;
+  background: #fbf1ef;
+  color: #7d3a32;
+}
+.admin-note {
+  background: #f1f3ec;
+}
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+.admin-dirty {
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+@media (max-width: 900px) {
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
+}

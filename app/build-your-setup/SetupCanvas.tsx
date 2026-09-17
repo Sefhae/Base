@@ -1,32 +1,75 @@
 'use client';
-import { useState } from 'react';
+import { Component, Suspense, useState, type ReactNode } from 'react';
 import { Canvas, type ThreeEvent } from '@react-three/fiber';
-import { ContactShadows, Grid, OrbitControls } from '@react-three/drei';
-import { findItem } from './catalog';
+import { ContactShadows, Gltf, Grid, OrbitControls } from '@react-three/drei';
 import { ItemModel } from './items';
 
-export type Placed = {
+/** What a piece is drawn from: a built-in shape, or an uploaded .glb. */
+export type PieceSource =
+  | { kind: 'builtin'; model: string; color: string }
+  | { kind: 'glb'; url: string };
+
+export type Piece = {
   uid: string;
-  itemId: string;
   x: number;
+  y: number;
   z: number;
+  /** Radians around the vertical axis. */
   rotation: number;
+  scale: number;
+  source: PieceSource;
+  /** Radius of the selection ring drawn on the floor. */
+  ringSize: number;
 };
 
 type Props = {
-  placed: Placed[];
-  selected: string | null;
-  onSelect: (uid: string | null) => void;
-  onMove: (uid: string, x: number, z: number) => void;
+  pieces: Piece[];
+  selected?: string | null;
+  onSelect?: (uid: string | null) => void;
+  /**
+   * Leave undefined to make the scene display-only. Customers get it undefined
+   * so pieces stay exactly where the admin panel put them; the admin panel
+   * passes it so a piece can be dragged into place.
+   */
+  onMove?: (uid: string, x: number, z: number) => void;
 };
 
 const FLOOR = 11;
 
-function Scene({ placed, selected, onSelect, onMove }: Props) {
+/**
+ * A .glb that fails to load (deleted file, bad upload, offline) would otherwise
+ * throw through Suspense and blank the whole canvas. Swallow it per piece so
+ * the rest of the scene survives.
+ */
+class PieceBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
+function PieceModel({ source }: { source: PieceSource }) {
+  if (source.kind === 'builtin') {
+    return <ItemModel model={source.model} color={source.color} />;
+  }
+  return (
+    <PieceBoundary>
+      <Suspense fallback={null}>
+        <Gltf src={source.url} castShadow receiveShadow />
+      </Suspense>
+    </PieceBoundary>
+  );
+}
+
+function Scene({ pieces, selected, onSelect, onMove }: Props) {
   const [dragging, setDragging] = useState<string | null>(null);
+  const canDrag = Boolean(onMove);
 
   const handleGroundMove = (event: ThreeEvent<PointerEvent>) => {
-    if (!dragging) return;
+    if (!dragging || !onMove) return;
     const limit = FLOOR / 2 - 0.5;
     const x = Math.max(-limit, Math.min(limit, event.point.x));
     const z = Math.max(-limit, Math.min(limit, event.point.z));
@@ -55,8 +98,8 @@ function Scene({ placed, selected, onSelect, onMove }: Props) {
         rotation={[-Math.PI / 2, 0, 0]}
         onPointerMove={handleGroundMove}
         onPointerUp={stopDragging}
-        onPointerMissed={() => onSelect(null)}
-        onClick={() => onSelect(null)}
+        onPointerMissed={() => onSelect?.(null)}
+        onClick={() => onSelect?.(null)}
       >
         <planeGeometry args={[FLOOR, FLOOR]} />
         <meshStandardMaterial color="#efece2" />
@@ -73,26 +116,28 @@ function Scene({ placed, selected, onSelect, onMove }: Props) {
         fadeDistance={22}
       />
 
-      {placed.map((piece) => {
-        const item = findItem(piece.itemId);
-        if (!item) return null;
+      {pieces.map((piece) => {
         const isSelected = selected === piece.uid;
         return (
           <group
             key={piece.uid}
-            position={[piece.x, 0, piece.z]}
+            position={[piece.x, piece.y, piece.z]}
             rotation={[0, piece.rotation, 0]}
+            scale={piece.scale}
             onPointerDown={(event: ThreeEvent<PointerEvent>) => {
+              if (!onSelect && !canDrag) return;
               event.stopPropagation();
-              onSelect(piece.uid);
-              setDragging(piece.uid);
+              onSelect?.(piece.uid);
+              if (canDrag) setDragging(piece.uid);
             }}
             onPointerUp={stopDragging}
           >
-            <ItemModel model={item.model} color={item.color} />
+            <PieceModel source={piece.source} />
             {isSelected ? (
               <mesh position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <ringGeometry args={[item.size * 0.5, item.size * 0.5 + 0.08, 32]} />
+                <ringGeometry
+                  args={[piece.ringSize * 0.5, piece.ringSize * 0.5 + 0.08, 32]}
+                />
                 <meshBasicMaterial color="#a2834d" />
               </mesh>
             ) : null}
@@ -126,7 +171,7 @@ export default function SetupCanvas(props: Props) {
       shadows
       dpr={[1, 2]}
       camera={{ position: [6.5, 5, 7.5], fov: 42 }}
-      onPointerMissed={() => props.onSelect(null)}
+      onPointerMissed={() => props.onSelect?.(null)}
     >
       <color attach="background" args={['#faf9f6']} />
       <fog attach="fog" args={['#faf9f6', 18, 34]} />

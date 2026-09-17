@@ -16,6 +16,32 @@ Open http://localhost:3001. Keep the terminal running while using the website.
 - `app/layout.tsx`: page title and search description.
 - `public/images/`: photographs reused from the supplied business website.
 
+## The setup catalog (/admin)
+
+`/build-your-setup` shows the 3D pieces you upload in the admin panel: what each
+one costs and the exact spot it takes when a customer picks it. Customers choose
+pieces; they cannot move them.
+
+One-time setup:
+
+1. Put your Supabase project URL and publishable key in `.env.local` (see
+   `.env.example`), then restart `npm run dev`.
+2. Supabase dashboard -> SQL Editor -> New query -> paste all of
+   `supabase/schema.sql` -> Run. This creates the `setup_items` table, the
+   public `models` storage bucket and the security policies. Safe to re-run.
+3. Supabase dashboard -> Authentication -> Users -> Add user, with
+   "Auto Confirm User" ticked. That account is the only way into `/admin`;
+   there is no sign-up anywhere on the site.
+4. Open `/admin`, sign in, and upload a `.glb`. Give it a price, drag it across
+   the floor to place it, then save.
+
+Until a piece has been uploaded, `/build-your-setup` falls back to the built-in
+shapes in `app/build-your-setup/catalog.ts`, whose prices are placeholders.
+
+On Vercel, add the same two `NEXT_PUBLIC_SUPABASE_*` variables under Project ->
+Settings -> Environment Variables, otherwise the live site keeps showing the
+fallback shapes.
+
 ## Validation
 
 - `npm run build`: production build.
