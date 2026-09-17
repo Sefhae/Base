@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowUpRight, ArrowRight, Menu, X, MapPin } from 'lucide-react';
+import { ArrowUpRight, ArrowRight, Menu, X } from 'lucide-react';
 import {
   Accordion,
   AccordionItem,
@@ -262,16 +262,6 @@ export default function Home() {
               <br />
               <em>A Florida backdrop.</em>
             </h2>
-          </div>
-          <div className="location-note">
-            <MapPin size={22} />
-            <div>
-              <h3>All over Florida</h3>
-              <p>
-                Based in Orlando and available statewide. Tell us where your
-                moment belongs and we will come to you.
-              </p>
-            </div>
           </div>
         </section>
         <section className="faq wrap" id="faqs">
