@@ -149,7 +149,7 @@ export default function BuildYourSetup() {
       </a>
       <header id="top">
         <Link href="/" className="logo" aria-label="BASE Entertainment home">
-          BASE<span>ENTERTAINMENT</span>
+          BASE
         </Link>
         <Link className="text-link" href="/">
           <ArrowLeft size={18} /> Back to the website
@@ -325,7 +325,7 @@ export default function BuildYourSetup() {
       <footer>
         <div className="footer-top">
           <Link href="/" className="logo">
-            BASE<span>ENTERTAINMENT</span>
+            BASE
           </Link>
         </div>
         <div className="footer-bottom">

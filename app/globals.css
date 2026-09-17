@@ -107,17 +107,19 @@ header {
   z-index: 20;
 }
 .logo {
-  font-family: Georgia, serif;
+  /* One knob for the wordmark tracking. The supplied SVG spaces the letters far
+     wider (roughly 1.3em); this is dialled back so the header still fits on a
+     phone next to the menu button. Raise it here to go closer to the artwork. */
+  --logo-track: 0.5em;
+  font-family: var(--font-logo), 'Poppins', Arial, sans-serif;
+  font-weight: 800;
   font-size: 40px;
-  letter-spacing: 0.19em;
+  letter-spacing: var(--logo-track);
+  /* letter-spacing also trails the last letter, which pushes the wordmark
+     visually off-centre; claw that trailing gap back. */
+  margin-right: calc(var(--logo-track) * -1);
   line-height: 1;
   display: inline-block;
-}
-.logo span {
-  display: block;
-  font: 9px Arial;
-  letter-spacing: 0.23em;
-  margin-top: 9px;
 }
 .logo {
   min-width: 132px;
@@ -504,11 +506,11 @@ footer {
     gap: 10px;
   }
   .logo {
+    /* Tighter tracking on phones: the full-width version collides with the
+       menu button and the nav call to action. */
+    --logo-track: 0.3em;
     font-size: 32px;
     min-width: 110px;
-  }
-  .logo span {
-    font-size: 8px;
   }
   .nav-cta {
     font-size: 11px;
@@ -646,9 +648,6 @@ footer {
 .footer-bottom {
   font-size: 12px;
 }
-.logo span {
-  font-size: 10px;
-}
 .hero .eyebrow {
   font-size: 12px;
 }
@@ -677,9 +676,6 @@ footer {
   }
   .hero .eyebrow {
     font-size: 12px;
-  }
-  .logo span {
-    font-size: 9px;
   }
 }
 .form-page {

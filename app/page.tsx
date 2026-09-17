@@ -73,7 +73,7 @@ export default function Home() {
       </a>
       <header id="top">
         <a href="#top" className="logo" aria-label="BASE Entertainment home">
-          BASE<span>ENTERTAINMENT</span>
+          BASE
         </a>
         <nav
           id="main-navigation"
@@ -317,7 +317,7 @@ export default function Home() {
       <footer>
         <div className="footer-top">
           <a href="#top" className="logo">
-            BASE<span>ENTERTAINMENT</span>
+            BASE
           </a>
         </div>
         <div className="footer-bottom">
