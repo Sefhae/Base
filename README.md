@@ -35,6 +35,22 @@ One-time setup:
 4. Open `/admin`, sign in, and upload a `.glb`. Give it a price, drag it across
    the floor to place it, then save.
 
+Packages: type a name into "Package for the next upload" and select several
+`.glb` files at once. They upload as separate pieces you place one by one, but
+customers see a single row that brings the whole arrangement in, priced at what
+its pieces come to together. Leave the box empty for a piece sold on its own,
+and move a piece in or out later with the Package field in its settings.
+
+Height is the one thing dragging cannot set — the drag moves a piece across the
+floor — so use the Height slider to hang, float or raise a piece.
+
+Re-run `supabase/schema.sql` after pulling changes: it is idempotent, and later
+columns (such as `package`) are added by it.
+
+Sign-ups: the write policies give any signed-in user full control of the
+catalog, so new sign-ups must be switched off in Supabase under Authentication
+-> Sign In / Providers -> Email. Your own account, created by hand, keeps
+working.
 Until a piece has been uploaded, `/build-your-setup` falls back to the built-in
 shapes in `app/build-your-setup/catalog.ts`, whose prices are placeholders.
 

@@ -30,6 +30,13 @@ create table if not exists public.setup_items (
   created_at timestamptz not null default now()
 );
 
+-- Pieces that belong together are sold as one package: same text in this
+-- column, one row in the customer palette, one price made of their prices.
+-- Null means the piece stands on its own. Added after the first release, so
+-- it is a separate statement rather than part of the create above.
+alter table public.setup_items
+  add column if not exists package text;
+
 alter table public.setup_items enable row level security;
 
 -- Public site: may read active items only.

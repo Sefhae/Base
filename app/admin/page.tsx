@@ -10,6 +10,7 @@ import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import {
   deleteItem,
   fetchAllItems,
+  groupIntoEntries,
   modelUrl,
   nameFromFile,
   saveItem,
@@ -26,8 +27,16 @@ const SetupCanvas = dynamic(() => import('../build-your-setup/SetupCanvas'), {
 const TO_DEGREES = 180 / Math.PI;
 const TO_RADIANS = Math.PI / 180;
 
+/** How high a piece may be lifted off the floor, in metres. */
+const MAX_HEIGHT = 4;
+
 /** Defaults a freshly uploaded model starts with: centre of the floor, unscaled. */
-const defaultsFor = (file: string, path: string, order: number) => ({
+const defaultsFor = (
+  file: string,
+  path: string,
+  order: number,
+  pkg: string,
+) => ({
   name: nameFromFile(file),
   category: String(CATEGORIES[0]),
   price: 0,
@@ -39,6 +48,7 @@ const defaultsFor = (file: string, path: string, order: number) => ({
   scale: 1,
   is_active: true,
   sort_order: order,
+  package: pkg.trim() || null,
 });
 
 /** Reads a number field without ever letting NaN reach the database. */
@@ -59,6 +69,8 @@ export default function AdminPanel() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  /** Package the next upload goes into; blank uploads stand on their own. */
+  const [packageName, setPackageName] = useState('');
 
   const load = useCallback(async () => {
     const { items: rows, error: loadError } = await fetchAllItems();
@@ -135,32 +147,55 @@ export default function AdminPanel() {
     });
   }, [draft, items, selectedId]);
 
-  const handleUpload = async (file: File) => {
-    if (!/\.(glb|gltf)$/i.test(file.name)) {
-      setError('Choose a .glb file (or .gltf). Other formats will not load.');
+  /**
+   * Several files at once become several pieces. Given a package name they all
+   * carry it, which is what makes them one row in the customer's palette — so a
+   * whole arrangement can be uploaded and placed piece by piece, then sold as
+   * one thing.
+   */
+  const handleUpload = async (files: File[]) => {
+    const models = files.filter((file) => /\.(glb|gltf)$/i.test(file.name));
+    if (models.length === 0) {
+      setError('Choose .glb files (or .gltf). Other formats will not load.');
       return;
     }
-    setBusy('Uploading…');
     setError(null);
     setNote(null);
-    const { path, error: uploadError } = await uploadModel(file);
-    if (!path) {
-      setBusy(null);
-      setError(uploadError);
-      return;
+
+    const added: SetupItemRow[] = [];
+    const failures: string[] = [];
+    for (const [index, file] of models.entries()) {
+      setBusy(`Uploading ${index + 1} of ${models.length}…`);
+      const { path, error: uploadError } = await uploadModel(file);
+      if (!path) {
+        failures.push(`${file.name}: ${uploadError}`);
+        continue;
+      }
+      const { item, error: saveError } = await saveItem(
+        defaultsFor(file.name, path, items.length + added.length, packageName),
+      );
+      if (!item) {
+        failures.push(`${file.name}: ${saveError}`);
+        continue;
+      }
+      added.push(item);
     }
-    const { item, error: saveError } = await saveItem(
-      defaultsFor(file.name, path, items.length),
-    );
     setBusy(null);
-    if (!item) {
-      setError(saveError);
-      return;
+
+    if (added.length > 0) {
+      setItems((current) => [...current, ...added]);
+      const first = added[0];
+      setSelectedId(first.id);
+      setDraft({ ...first });
+      setNote(
+        added.length === 1
+          ? 'Uploaded. Set the price and drag it into place, then save.'
+          : `${added.length} pieces uploaded${packageName.trim() ? ` into "${packageName.trim()}"` : ''}. Place and price them one by one.`,
+      );
     }
-    setItems((current) => [...current, item]);
-    setSelectedId(item.id);
-    setDraft({ ...item });
-    setNote('Uploaded. Set the price and drag it into place, then save.');
+    // Partial failures are named rather than summarised: which file failed is
+    // the only part the person here can act on.
+    setError(failures.length > 0 ? failures.join(' · ') : null);
   };
 
   const handleSave = async () => {
@@ -263,21 +298,36 @@ export default function AdminPanel() {
 
         <div className="admin-grid">
           <section className="admin-list" aria-label="Uploaded pieces">
+            <p className="field">
+              <label htmlFor="package-name">Package for the next upload</label>
+              <input
+                id="package-name"
+                value={packageName}
+                onChange={(event) => setPackageName(event.target.value)}
+                placeholder="Leave empty for single pieces"
+              />
+            </p>
             <label className="button admin-upload">
-              <Upload size={16} /> {busy === 'Uploading…' ? 'Uploading…' : 'Upload a .glb'}
+              <Upload size={16} /> {busy?.startsWith('Uploading') ? busy : 'Upload .glb files'}
               <input
                 ref={fileInput}
                 type="file"
                 accept=".glb,.gltf,model/gltf-binary"
+                multiple
                 hidden
                 onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) void handleUpload(file);
-                  // Let the same file be picked again after a failed upload.
+                  const files = [...(event.target.files ?? [])];
+                  if (files.length > 0) void handleUpload(files);
+                  // Let the same files be picked again after a failed upload.
                   if (fileInput.current) fileInput.current.value = '';
                 }}
               />
             </label>
+            <p className="admin-hint">
+              Pick several files at once to fill a package. Name the package
+              first and they all land in it; its price is what its pieces come
+              to together.
+            </p>
 
             {items.length === 0 ? (
               <p className="palette-empty">
@@ -286,24 +336,40 @@ export default function AdminPanel() {
               </p>
             ) : (
               <div className="palette-list">
-                {items.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={`palette-item${item.id === selectedId ? ' is-selected' : ''}`}
-                    onClick={() => select(item)}
-                  >
-                    <span className="palette-label">
-                      <span className="palette-name">{item.name}</span>
-                      <span className="palette-price">
-                        {CURRENCY}
-                        {item.price.toLocaleString('en-US')} · {item.category}
-                      </span>
-                    </span>
-                    {!item.is_active ? (
-                      <span className="palette-used">hidden</span>
+                {groupIntoEntries(items).map((entry) => (
+                  <div key={entry.key} className="palette-group">
+                    {entry.isPackage ? (
+                      <p className="palette-heading">
+                        <span>
+                          {entry.name} · {entry.items.length} pieces
+                        </span>
+                        <span>
+                          {CURRENCY}
+                          {entry.price.toLocaleString('en-US')}
+                        </span>
+                      </p>
                     ) : null}
-                  </button>
+                    {entry.items.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`palette-item${item.id === selectedId ? ' is-selected' : ''}`}
+                        onClick={() => select(item)}
+                      >
+                        <span className="palette-label">
+                          <span className="palette-name">{item.name}</span>
+                          <span className="palette-price">
+                            {CURRENCY}
+                            {item.price.toLocaleString('en-US')} ·{' '}
+                            {item.category}
+                          </span>
+                        </span>
+                        {!item.is_active ? (
+                          <span className="palette-used">hidden</span>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
                 ))}
               </div>
             )}
@@ -415,19 +481,35 @@ export default function AdminPanel() {
                   </p>
                 </div>
 
-                <div className="field-row">
-                  <p className="field">
-                    <label htmlFor="y">Height off the floor (y)</label>
+                {/* Height has no drag of its own — the floor drag sets x and z —
+                    so the slider is how a piece gets hung, floated or raised. */}
+                <p className="field">
+                  <label htmlFor="height">Height off the floor</label>
+                  <span className="admin-slider">
                     <input
-                      id="y"
+                      id="height"
+                      type="range"
+                      min={0}
+                      max={MAX_HEIGHT}
+                      step={0.05}
+                      value={Math.min(MAX_HEIGHT, Math.max(0, draft.position_y))}
+                      onChange={(event) =>
+                        patch({ position_y: num(event.target.value) })
+                      }
+                    />
+                    <input
                       type="number"
                       step={0.05}
+                      aria-label="Height off the floor in metres"
                       value={draft.position_y}
                       onChange={(event) =>
                         patch({ position_y: num(event.target.value) })
                       }
                     />
-                  </p>
+                  </span>
+                </p>
+
+                <div className="field-row">
                   <p className="field">
                     <label htmlFor="scale">Size</label>
                     <input
@@ -441,17 +523,28 @@ export default function AdminPanel() {
                       }
                     />
                   </p>
+                  <p className="field">
+                    <label htmlFor="rotation">Turn (degrees)</label>
+                    <input
+                      id="rotation"
+                      type="number"
+                      step={5}
+                      value={Math.round(draft.rotation_y * TO_DEGREES)}
+                      onChange={(event) =>
+                        patch({ rotation_y: num(event.target.value) * TO_RADIANS })
+                      }
+                    />
+                  </p>
                 </div>
 
                 <p className="field">
-                  <label htmlFor="rotation">Turn (degrees)</label>
+                  <label htmlFor="package">Package</label>
                   <input
-                    id="rotation"
-                    type="number"
-                    step={5}
-                    value={Math.round(draft.rotation_y * TO_DEGREES)}
+                    id="package"
+                    value={draft.package ?? ''}
+                    placeholder="Empty: sold on its own"
                     onChange={(event) =>
-                      patch({ rotation_y: num(event.target.value) * TO_RADIANS })
+                      patch({ package: event.target.value.trim() || null })
                     }
                   />
                 </p>

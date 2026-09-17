@@ -1119,3 +1119,17 @@ footer {
     grid-template-columns: 1fr;
   }
 }
+.admin-slider {
+  display: grid;
+  grid-template-columns: 1fr 96px;
+  align-items: center;
+  gap: 14px;
+}
+.admin-slider input[type='range'] {
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  accent-color: var(--primary);
+}
