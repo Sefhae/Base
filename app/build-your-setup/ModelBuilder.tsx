@@ -115,16 +115,16 @@ export default function ModelBuilder({ items }: { items: SetupItemRow[] }) {
     <div className="stage-bar">
       <span className="stage-status">
         {chosenEntries.length === 0
-          ? 'Choose a piece to begin'
-          : `${pieces.length} piece${pieces.length === 1 ? '' : 's'} in your setup`}
-        {SHOW_PRICES && chosenEntries.length > 0 ? (
-          <>
-            {' · '}
-            <strong className="stage-total">{formatPrice(total)}</strong>
-          </>
-        ) : null}
+          ? 'Nothing added yet'
+          : `${pieces.length} model${pieces.length === 1 ? '' : 's'} placed`}
       </span>
       <span className="stage-actions">
+        {SHOW_PRICES && chosenEntries.length > 0 ? (
+          <span className="stage-total">
+            <span>Estimate</span>
+            <strong>{formatPrice(total)}</strong>
+          </span>
+        ) : null}
         <button
           type="button"
           className="ghost-button"
@@ -159,7 +159,7 @@ export default function ModelBuilder({ items }: { items: SetupItemRow[] }) {
                 <div key={category} className="palette-group">
                   <p className="palette-heading">
                     <span>{category}</span>
-                    <span>{group.length}</span>
+                    <span className="palette-count">{group.length}</span>
                   </p>
                   {group.map((entry) => {
                     const added = chosen.includes(entry.key);
@@ -167,7 +167,7 @@ export default function ModelBuilder({ items }: { items: SetupItemRow[] }) {
                       <button
                         key={entry.key}
                         type="button"
-                        className="palette-item"
+                        className={`palette-item${added ? ' is-added' : ''}`}
                         onClick={() => toggle(entry.key)}
                         aria-pressed={added}
                         aria-label={`${added ? 'Remove' : 'Add'} ${entry.name}`}
@@ -181,19 +181,9 @@ export default function ModelBuilder({ items }: { items: SetupItemRow[] }) {
                               : null}
                           </span>
                         </span>
-                        {added ? (
-                          <Check
-                            className="palette-add"
-                            size={15}
-                            aria-hidden="true"
-                          />
-                        ) : (
-                          <Plus
-                            className="palette-add"
-                            size={15}
-                            aria-hidden="true"
-                          />
-                        )}
+                        <span className="palette-add" aria-hidden="true">
+                          {added ? <Check size={14} /> : <Plus size={14} />}
+                        </span>
                       </button>
                     );
                   })}
@@ -207,32 +197,70 @@ export default function ModelBuilder({ items }: { items: SetupItemRow[] }) {
           <div className="canvas-shell">
             {/* No onSelect or onMove: the layout is the admin's, not the visitor's. */}
             <SetupCanvas pieces={pieces} />
+            {chosenEntries.length === 0 ? (
+              <p className="stage-empty">
+                Your setup appears here. Pick a piece from the list to start.
+              </p>
+            ) : null}
           </div>
           {stageBar}
         </section>
       </div>
 
       <section className="setup-summary" aria-label="Your setup so far">
-        <h2>Your setup</h2>
+        <div className="summary-head">
+          <h2>Your setup</h2>
+          <span className="summary-badge">
+            {chosenEntries.length} item{chosenEntries.length === 1 ? '' : 's'} ·{' '}
+            {pieces.length} model{pieces.length === 1 ? '' : 's'}
+          </span>
+        </div>
+
         {chosenEntries.length === 0 ? (
-          <p>Nothing added yet. Pick a piece from the list to start.</p>
+          <p className="summary-empty">
+            Nothing added yet. Pick a piece from the list to start.
+          </p>
         ) : (
-          <ul>
+          <ul className="summary-list">
             {chosenEntries.map((entry) => (
-              <li key={entry.key}>
-                {entry.name}{' '}
-                <span>{entry.isPackage ? `${entry.items.length} models` : ''}</span>
-                {SHOW_PRICES ? <span>{formatPrice(entry.price)}</span> : null}
+              <li key={entry.key} className="summary-card">
+                <span className="summary-name">{entry.name}</span>
+                <span className="summary-foot">
+                  {entry.isPackage ? (
+                    <span className="summary-meta">
+                      {entry.items.length} models
+                    </span>
+                  ) : (
+                    <span className="summary-meta">Single piece</span>
+                  )}
+                  {SHOW_PRICES ? (
+                    <span className="summary-price">
+                      {formatPrice(entry.price)}
+                    </span>
+                  ) : null}
+                </span>
               </li>
             ))}
           </ul>
         )}
-        {SHOW_PRICES && chosenEntries.length > 0 ? (
-          <div className="setup-total">
-            <span>Estimated total</span>
-            <strong>{formatPrice(total)}</strong>
-          </div>
-        ) : null}
+
+        <div className="summary-footer">
+          {SHOW_PRICES ? (
+            <div className="setup-total">
+              <span>Estimated total</span>
+              <strong>{formatPrice(total)}</strong>
+            </div>
+          ) : null}
+          <button
+            type="button"
+            className="button"
+            onClick={sendToInquiry}
+            disabled={chosenEntries.length === 0}
+          >
+            Send this setup with my inquiry <ArrowUpRight size={18} />
+          </button>
+        </div>
+
         {SHOW_PRICES ? (
           <p className="price-note">
             These figures are a planning guide only. Your final quote depends on
@@ -240,14 +268,6 @@ export default function ModelBuilder({ items }: { items: SetupItemRow[] }) {
             with us directly.
           </p>
         ) : null}
-        <button
-          type="button"
-          className="button"
-          onClick={sendToInquiry}
-          disabled={chosenEntries.length === 0}
-        >
-          Send this setup with my inquiry <ArrowUpRight size={18} />
-        </button>
       </section>
     </>
   );

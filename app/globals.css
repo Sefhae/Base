@@ -2,7 +2,7 @@
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 :root {
-  --background: #faf9f6;
+  --background: #fff;
   --foreground: #252b29;
   --primary: #29483f;
   --primary-foreground: #fff;
@@ -12,6 +12,11 @@
   --input: #9ba49c;
   --ring: #567768;
   --radius: 0.3rem;
+  /* Large surfaces (panels, the 3D stage) carry a softer corner than controls. */
+  --radius-lg: 14px;
+  --shadow-sm: 0 1px 2px rgba(37, 43, 41, 0.05);
+  --shadow-md: 0 6px 20px -8px rgba(37, 43, 41, 0.16);
+  --accent: #a2834d;
   --font-sans: Arial, Helvetica, sans-serif;
   color-scheme: light;
 }
@@ -794,14 +799,15 @@ footer {
   top: 20px;
   background: #fff;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
 .palette-search {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 11px 14px;
+  padding: 13px 16px;
   border-bottom: 1px solid var(--border);
   color: var(--muted-foreground);
 }
@@ -833,29 +839,57 @@ footer {
   justify-content: space-between;
   gap: 10px;
   margin: 0;
-  padding: 13px 14px 7px;
+  padding: 14px 16px 8px;
   background: #fff;
   font-size: 10px;
+  font-weight: 600;
   letter-spacing: 0.19em;
   text-transform: uppercase;
   color: var(--muted-foreground);
+}
+.palette-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
 }
 .palette-group + .palette-group .palette-heading {
   border-top: 1px solid var(--border);
 }
 .palette-item {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 12px;
   width: 100%;
-  min-height: 48px;
-  padding: 8px 14px;
+  min-height: 52px;
+  padding: 8px 16px;
   font: inherit;
   text-align: left;
   color: var(--foreground);
   background: transparent;
   border: 0;
   border-radius: 0;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+/* A left rail marks the added row without shifting any layout. */
+.palette-item::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: transparent;
 }
 .palette-item:hover {
   background: var(--muted);
@@ -863,6 +897,15 @@ footer {
 .palette-item:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: -2px;
+}
+.palette-item.is-added {
+  background: #f2f5f1;
+}
+.palette-item.is-added::before {
+  background: var(--primary);
+}
+.palette-item.is-added .palette-name {
+  font-weight: 600;
 }
 .swatch {
   width: 16px;
@@ -895,15 +938,32 @@ footer {
   font-size: 11px;
   flex-shrink: 0;
 }
+/* Always visible: a hover-only affordance is invisible on touch, where most of
+   this page is used, and leaves the row looking inert. */
 .palette-add {
-  color: var(--muted-foreground);
-  opacity: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
   flex-shrink: 0;
-  transition: opacity 0.15s;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  color: var(--muted-foreground);
+  background: #fff;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
-.palette-item:hover .palette-add,
-.palette-item:focus-visible .palette-add {
-  opacity: 1;
+.palette-item:hover .palette-add {
+  border-color: var(--ring);
+  color: var(--foreground);
+}
+.palette-item.is-added .palette-add {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
 }
 .palette-empty {
   margin: 0;
@@ -911,13 +971,33 @@ footer {
   font-size: 13px;
 }
 .canvas-shell {
+  position: relative;
   height: min(62vh, 560px);
   min-height: 360px;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   background: var(--background);
+  box-shadow: var(--shadow-md);
   touch-action: none;
+}
+/* Sits over the empty 3D floor, so the stage explains itself instead of
+   reading as a blank box. Never intercepts the orbit drag. */
+.stage-empty {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  margin: 0;
+  max-width: min(90%, 360px);
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--muted-foreground);
+  font-size: 13px;
+  text-align: center;
+  pointer-events: none;
 }
 .canvas-loading {
   display: flex;
@@ -932,17 +1012,24 @@ footer {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  margin-top: 14px;
+  gap: 12px 16px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 .stage-status {
   font-size: 13px;
   color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
 }
 .stage-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  align-items: center;
+  gap: 8px 16px;
 }
 .ghost-button {
   display: inline-flex;
@@ -965,26 +1052,107 @@ footer {
   opacity: 0.45;
   cursor: not-allowed;
 }
+/* The whole block is a panel, not a run of loose text under a rule. */
 .setup-summary {
   margin-top: 48px;
-  border-top: 1px solid var(--border);
-  padding-top: 28px;
+  padding: 28px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 .setup-summary h2 {
   font-size: 26px;
-  margin-bottom: 14px;
+  margin: 0;
 }
-.setup-summary ul {
-  list-style: none;
-  margin: 0 0 22px;
-  padding: 0;
+.summary-head {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 26px;
-  font-size: 15px;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 20px;
 }
-.setup-summary li span {
+.summary-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--muted);
   color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* Each chosen piece is its own box, so the setup reads as a set of things
+   rather than a run-on line of text. */
+.summary-list {
+  list-style: none;
+  margin: 0 0 24px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+  gap: 14px;
+}
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 104px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.summary-name {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.summary-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.summary-meta {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.summary-price {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.summary-empty {
+  margin: 0 0 24px;
+  padding: 28px 20px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  color: var(--muted-foreground);
+}
+.summary-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.summary-footer .button {
+  flex-shrink: 0;
 }
 .setup-summary .button:disabled {
   opacity: 0.45;
@@ -1005,39 +1173,50 @@ footer {
   font-size: 12px;
   color: var(--muted-foreground);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  .palette-item,
+  .palette-add {
+    transition: none;
+  }
 }
 .stage-total {
-  font-size: 13px;
-  color: var(--foreground);
-}
-.setup-summary li {
-  display: flex;
+  display: inline-flex;
   align-items: baseline;
   gap: 8px;
-}
-.setup-summary li span {
+  font-size: 13px;
   color: var(--muted-foreground);
+}
+.stage-total strong {
+  font-size: 17px;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
 }
 .setup-total {
   display: flex;
-  flex-wrap: wrap;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 8px 20px;
-  border-top: 1px solid var(--border);
-  margin-top: 18px;
-  padding-top: 16px;
+  gap: 14px;
+  padding: 14px 20px;
+  background: var(--muted);
+  border-radius: var(--radius-lg);
+}
+.setup-total span {
+  font-size: 13px;
+  color: var(--muted-foreground);
 }
 .setup-total strong {
   font-family: Georgia, 'Times New Roman', serif;
   font-size: clamp(26px, 3vw, 34px);
   font-weight: 400;
   letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
 }
 .price-note {
-  margin: 12px 0 24px;
+  margin: 20px 0 0;
   font-size: 13px;
   max-width: 580px;
+  color: var(--muted-foreground);
 }
 
 /* ---------------------------------------------------------------------------

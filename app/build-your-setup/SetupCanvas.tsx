@@ -173,8 +173,8 @@ export default function SetupCanvas(props: Props) {
       camera={{ position: [6.5, 5, 7.5], fov: 42 }}
       onPointerMissed={() => props.onSelect?.(null)}
     >
-      <color attach="background" args={['#faf9f6']} />
-      <fog attach="fog" args={['#faf9f6', 18, 34]} />
+      <color attach="background" args={['#ffffff']} />
+      <fog attach="fog" args={['#ffffff', 18, 34]} />
       <Scene {...props} />
     </Canvas>
   );
