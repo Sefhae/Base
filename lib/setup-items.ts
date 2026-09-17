@@ -16,8 +16,9 @@ export type SetupItemRow = {
   is_active: boolean;
   sort_order: number;
   /**
-   * Pieces sharing this text are sold together as one package. Null means the
-   * piece stands on its own.
+   * Rows sharing this text are one thing to the customer: clicking it brings
+   * every one of them in, each at its own spot. Copies of a model live here.
+   * Null means the row stands on its own.
    */
   package: string | null;
 };
@@ -61,12 +62,12 @@ export async function fetchAllItems(): Promise<FetchResult> {
 
 
 /**
- * One row in a palette: either a lone piece, or a package standing for the
- * several pieces uploaded into it. A package costs what its pieces cost
- * together, so there is no second price to keep in step with the first.
+ * One row in a palette: a lone model, or a group standing for several rows —
+ * copies of one model, or different models placed together. A group costs what
+ * its rows cost together, so there is no second price to keep in step.
  */
 export type CatalogEntry = {
-  /** Stable key: the package name, or the id of a lone piece. */
+  /** Stable key: the group name, or the id of a lone row. */
   key: string;
   name: string;
   category: string;
@@ -75,7 +76,7 @@ export type CatalogEntry = {
   isPackage: boolean;
 };
 
-/** Collapses rows into palette entries, packages first-come in list order. */
+/** Collapses rows into palette entries, groups first-come in list order. */
 export function groupIntoEntries(items: SetupItemRow[]): CatalogEntry[] {
   const entries: CatalogEntry[] = [];
   const byPackage = new Map<string, CatalogEntry>();
@@ -149,13 +150,15 @@ export async function uploadModel(
 }
 
 /**
- * Postgres names the missing column and stops there, which reads as a bug
- * rather than as a migration that has not been run yet. Say what to do.
+ * A column Postgres cannot find reads as a bug rather than as a migration that
+ * has not been run yet. PostgREST phrases the same thing a second way when its
+ * cached copy of the table is stale, so both wordings reach the same advice.
  */
 const explain = (message: string) =>
-  /column .*package.* does not exist/i.test(message)
-    ? "The database has no `package` column yet. Open the Supabase SQL editor and run: alter table public.setup_items add column if not exists package text;"
+  /(does not exist|schema cache|could not find)/i.test(message)
+    ? `${message} — the database is behind the code. Open the Supabase SQL editor and run supabase/schema.sql.`
     : message;
+
 /** Inserts a new row, or updates the existing one when the draft carries an id. */
 export async function saveItem(
   draft: SetupItemDraft,
@@ -170,9 +173,42 @@ export async function saveItem(
   return { item: data as SetupItemRow, error: null };
 }
 
+/** How far apart copies are dropped, in metres, so none hides inside another. */
+const COPY_SPACING = 0.8;
+
 /**
- * Removes the row and then its .glb. The row goes first: a leftover file is
- * harmless, while a row pointing at a deleted file would break the scene.
+ * Makes `count` more of one model: new rows pointing at the same .glb, so
+ * nothing is uploaded twice. They all carry one group name, which is what makes
+ * the customer see a single entry that brings every copy in at once. Each copy
+ * is a row of its own, so each can be placed, turned and resized separately.
+ */
+export async function copyItem(
+  item: SetupItemRow,
+  count: number,
+  group: string,
+): Promise<{ items: SetupItemRow[]; error: string | null }> {
+  if (!supabase) return { items: [], error: NOT_CONFIGURED };
+  const made: SetupItemRow[] = [];
+  for (let copy = 1; copy <= count; copy += 1) {
+    const { id: _id, ...values } = item;
+    const { item: saved, error } = await saveItem({
+      ...values,
+      package: group,
+      // Dropped on the exact same spot the copies would hide inside each other,
+      // leaving the ones underneath impossible to click.
+      position_x: item.position_x + copy * COPY_SPACING,
+      sort_order: item.sort_order + copy,
+    });
+    if (!saved) return { items: made, error };
+    made.push(saved);
+  }
+  return { items: made, error: null };
+}
+
+/**
+ * Removes the row, and its .glb only when no other row still points at that
+ * file. Copies share one upload, so deleting a copy must not take the file out
+ * from under the rows that remain.
  */
 export async function deleteItem(
   item: SetupItemRow,
@@ -180,6 +216,14 @@ export async function deleteItem(
   if (!supabase) return { error: NOT_CONFIGURED };
   const { error } = await supabase.from('setup_items').delete().eq('id', item.id);
   if (error) return { error: error.message };
-  await supabase.storage.from(MODELS_BUCKET).remove([item.model_path]);
+
+  const { data: sharing } = await supabase
+    .from('setup_items')
+    .select('id')
+    .eq('model_path', item.model_path)
+    .limit(1);
+  if ((sharing ?? []).length === 0) {
+    await supabase.storage.from(MODELS_BUCKET).remove([item.model_path]);
+  }
   return { error: null };
 }

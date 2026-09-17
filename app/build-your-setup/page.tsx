@@ -25,7 +25,7 @@ export default function BuildYourSetup() {
       // A visitor can do nothing about a database that is down, and the
       // built-in shapes below still give them a working page, so the failure
       // is logged rather than shown. The admin panel surfaces the real error.
-      if (error) console.warn("Could not load the uploaded catalog:", error);
+      if (error) console.warn('Could not load the uploaded catalog:', error);
     });
     return () => {
       alive = false;

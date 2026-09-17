@@ -1,13 +1,13 @@
 'use client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { ExternalLink, LogOut, Trash2, Upload } from 'lucide-react';
+import { Copy, ExternalLink, LogOut, Trash2, Upload } from 'lucide-react';
 import { CATEGORIES, CURRENCY } from '../build-your-setup/catalog';
 import type { Piece } from '../build-your-setup/SetupCanvas';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import {
+  copyItem,
   deleteItem,
   fetchAllItems,
   groupIntoEntries,
@@ -17,6 +17,7 @@ import {
   type SetupItemRow,
   uploadModel,
 } from '@/lib/setup-items';
+import { useAdminSession } from './useAdminSession';
 
 const SetupCanvas = dynamic(() => import('../build-your-setup/SetupCanvas'), {
   ssr: false,
@@ -31,12 +32,7 @@ const TO_RADIANS = Math.PI / 180;
 const MAX_HEIGHT = 4;
 
 /** Defaults a freshly uploaded model starts with: centre of the floor, unscaled. */
-const defaultsFor = (
-  file: string,
-  path: string,
-  order: number,
-  pkg: string,
-) => ({
+const defaultsFor = (file: string, path: string, order: number) => ({
   name: nameFromFile(file),
   category: String(CATEGORIES[0]),
   price: 0,
@@ -48,7 +44,7 @@ const defaultsFor = (
   scale: 1,
   is_active: true,
   sort_order: order,
-  package: pkg.trim() || null,
+  package: null,
 });
 
 /** Reads a number field without ever letting NaN reach the database. */
@@ -58,49 +54,30 @@ const num = (value: string, fallback = 0) => {
 };
 
 export default function AdminPanel() {
-  const router = useRouter();
   const fileInput = useRef<HTMLInputElement>(null);
-  // Starts false when there is no client to ask: that case renders the
-  // "not configured" screen below without ever consulting this flag.
-  const [checking, setChecking] = useState(Boolean(supabase));
   const [items, setItems] = useState<SetupItemRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<SetupItemRow | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
-  /** Package the next upload goes into; blank uploads stand on their own. */
-  const [packageName, setPackageName] = useState('');
+  /** How many extra copies the "Make copies" control will create. */
+  const [copies, setCopies] = useState(1);
 
   const load = useCallback(async () => {
     const { items: rows, error: loadError } = await fetchAllItems();
     setItems(rows);
     setError(loadError);
-    return rows;
   }, []);
 
-  // Nobody without a session gets to see the panel. Row level security would
-  // refuse the writes anyway; this just avoids showing an unusable screen.
-  useEffect(() => {
-    if (!supabase) return;
-    let alive = true;
-    void supabase.auth.getSession().then(async ({ data }) => {
-      if (!alive) return;
-      if (!data.session) {
-        router.replace('/admin/login');
-        return;
-      }
-      await load();
-      if (alive) setChecking(false);
-    });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) router.replace('/admin/login');
-    });
-    return () => {
-      alive = false;
-      listener.subscription.unsubscribe();
-    };
-  }, [load, router]);
+  const checking = useAdminSession(load);
+
+  /** How many models share the edited model's group, counting itself. */
+  const groupSize = useMemo(() => {
+    const group = draft?.package?.trim();
+    if (!group) return 0;
+    return items.filter((item) => item.package?.trim() === group).length;
+  }, [draft, items]);
 
   const selected = items.find((item) => item.id === selectedId) ?? null;
   const dirty = Boolean(
@@ -147,12 +124,7 @@ export default function AdminPanel() {
     });
   }, [draft, items, selectedId]);
 
-  /**
-   * Several files at once become several pieces. Given a package name they all
-   * carry it, which is what makes them one row in the customer's palette — so a
-   * whole arrangement can be uploaded and placed piece by piece, then sold as
-   * one thing.
-   */
+  /** Several files at once become several models in the library. */
   const handleUpload = async (files: File[]) => {
     const models = files.filter((file) => /\.(glb|gltf)$/i.test(file.name));
     if (models.length === 0) {
@@ -161,6 +133,23 @@ export default function AdminPanel() {
     }
     setError(null);
     setNote(null);
+
+    // Adding another model mid-edit must not cost the placement just made. The
+    // piece being edited is already a row, so its pending edits are committed
+    // before the upload takes the selection away from it.
+    if (draft && dirty) {
+      setBusy('Saving the current piece…');
+      const { item, error: saveError } = await saveItem(draft);
+      if (!item) {
+        setBusy(null);
+        setError(saveError);
+        return;
+      }
+      setItems((current) =>
+        current.map((entry) => (entry.id === item.id ? item : entry)),
+      );
+      setDraft({ ...item });
+    }
 
     const added: SetupItemRow[] = [];
     const failures: string[] = [];
@@ -172,7 +161,7 @@ export default function AdminPanel() {
         continue;
       }
       const { item, error: saveError } = await saveItem(
-        defaultsFor(file.name, path, items.length + added.length, packageName),
+        defaultsFor(file.name, path, items.length + added.length),
       );
       if (!item) {
         failures.push(`${file.name}: ${saveError}`);
@@ -188,9 +177,9 @@ export default function AdminPanel() {
       setSelectedId(first.id);
       setDraft({ ...first });
       setNote(
-        added.length === 1
-          ? 'Uploaded. Set the price and drag it into place, then save.'
-          : `${added.length} pieces uploaded${packageName.trim() ? ` into "${packageName.trim()}"` : ''}. Place and price them one by one.`,
+        `${added.length === 1 ? 'Uploaded' : `${added.length} models uploaded`}. Price ${
+          added.length === 1 ? 'it' : 'them'
+        } and save, then build a setup to place ${added.length === 1 ? 'it' : 'them'}.`,
       );
     }
     // Partial failures are named rather than summarised: which file failed is
@@ -213,6 +202,51 @@ export default function AdminPanel() {
     );
     setDraft({ ...item });
     setNote('Saved. Customers see this straight away.');
+  };
+
+  /**
+   * Turns the selected model into several of itself. The copies point at the
+   * same uploaded file — nothing is uploaded twice — and the whole set is given
+   * one group name, which is what makes the customer see a single entry that
+   * brings every copy in at once. Each copy is placed on its own afterwards.
+   */
+  const handleCopy = async () => {
+    if (!draft) return;
+    setBusy('Copying…');
+    setError(null);
+
+    // Copies start from what is on screen, so pending edits are committed
+    // first, along with the group name the set will share.
+    const group = draft.package?.trim() || draft.name.trim() || 'Group';
+    let source = draft;
+    if (dirty || !draft.package?.trim()) {
+      const { item, error: saveError } = await saveItem({ ...draft, package: group });
+      if (!item) {
+        setBusy(null);
+        setError(saveError);
+        return;
+      }
+      source = item;
+      setItems((current) =>
+        current.map((entry) => (entry.id === item.id ? item : entry)),
+      );
+      setDraft({ ...item });
+    }
+
+    const { items: made, error: copyError } = await copyItem(source, copies, group);
+    setBusy(null);
+    if (made.length > 0) {
+      setItems((current) => [...current, ...made]);
+      setSelectedId(made[0].id);
+      setDraft({ ...made[0] });
+    }
+    if (copyError) {
+      setError(copyError);
+      return;
+    }
+    setNote(
+      `${made.length} more added. Drag each one where it belongs and save. Customers click "${group}" once and all ${made.length + 1} appear.`,
+    );
   };
 
   const handleDelete = async () => {
@@ -285,11 +319,12 @@ export default function AdminPanel() {
       <main id="main" className="admin wrap">
         <div className="builder-head">
           <p className="eyebrow">SETUP CATALOG</p>
-          <h1>Your 3D pieces</h1>
+          <h1>Your 3D models</h1>
           <p className="form-intro">
-            Upload a model, give it a price, and drag it to the spot it should
-            take when a customer picks it. That spot is fixed — customers choose
-            pieces, they do not move them.
+            Upload a model, price it, and drag it where it belongs. Need several
+            of the same thing? Use <strong>Make copies</strong> — the copies land
+            beside it, you place each one, and customers get them all in one
+            click.
           </p>
         </div>
 
@@ -298,15 +333,6 @@ export default function AdminPanel() {
 
         <div className="admin-grid">
           <section className="admin-list" aria-label="Uploaded pieces">
-            <p className="field">
-              <label htmlFor="package-name">Package for the next upload</label>
-              <input
-                id="package-name"
-                value={packageName}
-                onChange={(event) => setPackageName(event.target.value)}
-                placeholder="Leave empty for single pieces"
-              />
-            </p>
             <label className="button admin-upload">
               <Upload size={16} /> {busy?.startsWith('Uploading') ? busy : 'Upload .glb files'}
               <input
@@ -324,14 +350,12 @@ export default function AdminPanel() {
               />
             </label>
             <p className="admin-hint">
-              Pick several files at once to fill a package. Name the package
-              first and they all land in it; its price is what its pieces come
-              to together.
+              Pick several files at once to add them in one go.
             </p>
 
             {items.length === 0 ? (
               <p className="palette-empty">
-                Nothing uploaded yet. Until you add a piece, the public page
+                Nothing uploaded yet. Until you add a model, the public page
                 keeps showing the built-in shapes.
               </p>
             ) : (
@@ -341,7 +365,7 @@ export default function AdminPanel() {
                     {entry.isPackage ? (
                       <p className="palette-heading">
                         <span>
-                          {entry.name} · {entry.items.length} pieces
+                          {entry.name} · {entry.items.length} models, one click
                         </span>
                         <span>
                           {CURRENCY}
@@ -349,7 +373,7 @@ export default function AdminPanel() {
                         </span>
                       </p>
                     ) : null}
-                    {entry.items.map((item) => (
+                    {entry.items.map((item, index) => (
                       <button
                         key={item.id}
                         type="button"
@@ -357,11 +381,15 @@ export default function AdminPanel() {
                         onClick={() => select(item)}
                       >
                         <span className="palette-label">
-                          <span className="palette-name">{item.name}</span>
+                          <span className="palette-name">
+                            {item.name}
+                            {entry.isPackage
+                              ? ` ${index + 1} of ${entry.items.length}`
+                              : ''}
+                          </span>
                           <span className="palette-price">
                             {CURRENCY}
-                            {item.price.toLocaleString('en-US')} ·{' '}
-                            {item.category}
+                            {item.price.toLocaleString('en-US')} · {item.category}
                           </span>
                         </span>
                         {!item.is_active ? (
@@ -538,11 +566,45 @@ export default function AdminPanel() {
                 </div>
 
                 <p className="field">
-                  <label htmlFor="package">Package</label>
+                  <label htmlFor="copies">
+                    Make copies — how many more of this model?
+                  </label>
+                  <span className="admin-slider">
+                    <input
+                      id="copies"
+                      type="number"
+                      min={1}
+                      max={25}
+                      step={1}
+                      value={copies}
+                      onChange={(event) =>
+                        setCopies(
+                          Math.min(25, Math.max(1, Math.round(num(event.target.value, 1)))),
+                        )
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="button"
+                      onClick={() => void handleCopy()}
+                      disabled={busy !== null}
+                    >
+                      <Copy size={16} /> Add {copies} more
+                    </button>
+                  </span>
+                </p>
+                <p className="admin-hint">
+                  {groupSize > 1
+                    ? `"${draft.package?.trim()}" holds ${groupSize} models. Customers click it once and all ${groupSize} appear, each where you put it. Pick any of them on the left to move it.`
+                    : 'Copies reuse this same upload and land beside it. They share one name, so customers click once and every copy appears at the spot you gave it.'}
+                </p>
+
+                <p className="field">
+                  <label htmlFor="package">Group name</label>
                   <input
                     id="package"
                     value={draft.package ?? ''}
-                    placeholder="Empty: sold on its own"
+                    placeholder="Empty: this model appears on its own"
                     onChange={(event) =>
                       patch({ package: event.target.value.trim() || null })
                     }

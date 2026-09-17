@@ -35,17 +35,24 @@ One-time setup:
 4. Open `/admin`, sign in, and upload a `.glb`. Give it a price, drag it across
    the floor to place it, then save.
 
-Packages: type a name into "Package for the next upload" and select several
-`.glb` files at once. They upload as separate pieces you place one by one, but
-customers see a single row that brings the whole arrangement in, priced at what
-its pieces come to together. Leave the box empty for a piece sold on its own,
-and move a piece in or out later with the Package field in its settings.
+Several of one model: select it, set **Make copies** to how many more you want,
+and press Add. The copies point at the same upload — nothing is uploaded twice —
+and land beside the original so none hides inside another. Drag each one where
+it belongs and save it. They share a **Group name** (the model's name by
+default), which is what makes customers see a single entry: one click brings
+every copy in, each at the spot you gave it, priced at what they come to
+together.
+
+Different models can share a group too — put the same Group name on each, and
+they appear together on one click, an arch with its candles and rug.
 
 Height is the one thing dragging cannot set — the drag moves a piece across the
 floor — so use the Height slider to hang, float or raise a piece.
 
-Re-run `supabase/schema.sql` after pulling changes: it is idempotent, and later
-columns (such as `package`) are added by it.
+Re-run `supabase/schema.sql` after pulling changes: it is idempotent, adds later
+columns (such as `package`) to an existing table, and reloads Supabase's REST
+schema cache. If the admin reports a column it cannot find, run
+`supabase/schema.sql` again in the Supabase SQL editor, then retry.
 
 Sign-ups: the write policies give any signed-in user full control of the
 catalog, so new sign-ups must be switched off in Supabase under Authentication

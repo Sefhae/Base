@@ -27,6 +27,8 @@ create table if not exists public.setup_items (
   scale double precision not null default 1,
   is_active boolean not null default true,
   sort_order integer not null default 0,
+  -- Pieces with the same package name are shown as one customer-facing entry.
+  package text,
   created_at timestamptz not null default now()
 );
 
@@ -36,6 +38,9 @@ create table if not exists public.setup_items (
 -- it is a separate statement rather than part of the create above.
 alter table public.setup_items
   add column if not exists package text;
+
+-- Keep the Supabase REST API in step when this script changes an existing table.
+notify pgrst, 'reload schema';
 
 alter table public.setup_items enable row level security;
 

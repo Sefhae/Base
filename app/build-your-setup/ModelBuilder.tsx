@@ -24,8 +24,9 @@ const SetupCanvas = dynamic(() => import('./SetupCanvas'), {
  * away. Nothing in here can move a piece: the layout is the admin's design,
  * not the visitor's.
  *
- * A package is one entry made of several models — choosing it brings the whole
- * arrangement in at once.
+ * A group is one entry made of several models — copies of one model, or
+ * different models placed together. Choosing it brings the whole arrangement in
+ * at once, each model at the spot the admin panel gave it.
  */
 export default function ModelBuilder({ items }: { items: SetupItemRow[] }) {
   const router = useRouter();
@@ -96,7 +97,7 @@ export default function ModelBuilder({ items }: { items: SetupItemRow[] }) {
   const sendToInquiry = () => {
     const lines = chosenEntries.map((entry) => {
       const label = entry.isPackage
-        ? `${entry.name} (${entry.items.length} pieces)`
+        ? `${entry.name} (${entry.items.length} models)`
         : entry.name;
       return SHOW_PRICES ? `- ${label} — ${formatPrice(entry.price)}` : `- ${label}`;
     });
@@ -176,7 +177,7 @@ export default function ModelBuilder({ items }: { items: SetupItemRow[] }) {
                           <span className="palette-price">
                             {SHOW_PRICES ? formatPrice(entry.price) : null}
                             {entry.isPackage
-                              ? `${SHOW_PRICES ? ' · ' : ''}${entry.items.length} pieces`
+                              ? `${SHOW_PRICES ? ' · ' : ''}${entry.items.length} models`
                               : null}
                           </span>
                         </span>
@@ -220,7 +221,7 @@ export default function ModelBuilder({ items }: { items: SetupItemRow[] }) {
             {chosenEntries.map((entry) => (
               <li key={entry.key}>
                 {entry.name}{' '}
-                <span>{entry.isPackage ? `${entry.items.length} pieces` : ''}</span>
+                <span>{entry.isPackage ? `${entry.items.length} models` : ''}</span>
                 {SHOW_PRICES ? <span>{formatPrice(entry.price)}</span> : null}
               </li>
             ))}
